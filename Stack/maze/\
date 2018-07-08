@@ -1,0 +1,339 @@
+#include "maze.h"
+
+void PointInit(Point* entry)
+{
+    if(entry == NULL)
+        return;
+    entry->row = 0;
+    entry->col = 1;
+    return;
+}
+
+void MazeInit(Maze* maze)//初始化,建立一个迷宫地图
+{
+    if(maze == NULL)
+        return;
+    int map[ROW][COL] = {{0,1,0,0,0,0,0,0},\
+                         {0,1,1,1,0,0,0,0},\
+                         {0,1,0,0,0,0,0,0},\
+                         {0,1,0,0,0,0,0,0},\
+                         {0,1,0,0,0,0,0,0},\
+                         {0,1,1,1,0,0,0,0},\
+                         {0,0,1,1,0,0,0,0},\
+                         {0,0,1,0,0,0,0,0}};//1表示路，0表示墙，之后走过的路标记为2
+    size_t i = 0;
+    for(; i<ROW; ++i)
+    {
+        size_t j = 0;
+        for(; j<COL; ++j)
+        {
+            maze->map[i][j] = map[i][j];
+        }
+    }
+    return;
+}
+
+void MazePrint(Maze* maze, const char* msg)//打印迷宫
+{
+    printf("[%s]\n",msg);
+    if(maze == NULL)
+        return;
+    size_t i = 0;
+    for(; i<ROW; ++i)
+    {
+        size_t j = 0;
+        for(; j<COL; ++j)
+        {
+            printf("%2d ",maze->map[i][j]);
+        }
+        printf("\n");
+    }
+    return;
+}
+
+int CanStay(Maze* maze, Point cur)//判断当前点是否能落脚
+{
+    if(maze == NULL)
+        return 0;
+    if(cur.row < 0 || cur.row >= ROW || cur.col < 0 || cur.col >= COL)//当前点越界，不在迷宫地图内
+        return 0;
+    if(maze->map[cur.row][cur.col] == 1)
+        return 1;
+    return 0;
+}
+
+void Mark(Maze* maze, Point cur)//标记当前点，将对应值改为2即可
+{
+    if(maze == NULL)
+        return;
+    maze->map[cur.row][cur.col] = 2;
+    return;
+}
+
+int IsExit(Maze* maze, Point cur, Point entry)//判断当前点是否为出口，注意判断是否为入口
+{
+    if(maze == NULL)
+        return 0;
+    if(cur.row == entry.row && cur.col == entry.col)//当前点为入口点
+        return 0;
+    if(cur.row == 0 || cur.row == ROW-1 || cur.col == 0 || cur.col == COL-1)//迷宫有四条边，每一个边上的点都可作出口
+        return 1;
+    return 0;
+}
+
+///////////////////////////////////////////////////////////////////
+/////////////          1.利用递归查找路径          ////////////////
+///////////////////////////////////////////////////////////////////
+
+void _GetPath(Maze* maze, Point cur, Point entry)//真正实现查找迷宫路径的函数
+{
+    printf("cur : (%d, %d)\n",cur.row,cur.col);//可看到函数调用的过程
+    if(maze == NULL)
+        return;
+    //1.判断当前点是否能落脚
+    if(!CanStay(maze,cur))
+        return;
+    //2.能落脚就标记
+    Mark(maze,cur);
+    //3.判断当前点是否为出口(非入口、迷宫最外围),为出口，就找到一条路径
+    if(IsExit(maze,cur,entry))
+    {
+        printf("找到一条路\n");
+        return;
+    }
+    //4.不为出口，顺时针探测四周点，递归调用函数本身，递归时更新cur
+    Point up = cur;//上方点
+    up.row -= 1;
+    _GetPath(maze,up,entry);
+    Point right = cur;//右方点
+    right.col += 1;
+    _GetPath(maze,right,entry);
+    Point down = cur;//下方点
+    down.row += 1;
+    _GetPath(maze,down,entry);
+    Point left = cur;//左方点
+    left.col -= 1;
+    _GetPath(maze,left,entry);
+    return;
+}
+
+void GetPath(Maze* maze,Point entry)//寻找迷宫路径
+{
+    if(maze == NULL)
+        return;
+    _GetPath(maze,entry,entry);//调用寻找函数，第二个参数表示当前位置，第三个参数表示入口点
+}
+
+///////////////////////////////////////////////////////////////////
+/////////////     2.利用非递归(循环)查找路径       ////////////////
+///////////////////////////////////////////////////////////////////
+
+void SeqStackInit(SeqStack* stack)
+{
+    if(stack == NULL)
+        return;
+    stack->size = 0;
+    stack->capacity = 100;
+    stack->data = (Point*)malloc(sizeof(Point) * stack->capacity);
+    return;
+}
+
+void SeqStackPush(SeqStack* stack,Point value)
+{
+    if(stack == NULL)
+        return;
+    if(stack->size >= stack->capacity)
+        return;
+    stack->data[(stack->size)++] = value;
+    return;
+}
+
+void SeqStackPop(SeqStack* stack)
+{
+    if(stack == NULL)
+        return;
+    if(stack->size == 0)
+        return;
+    --stack->size;
+    return;
+}
+
+int SeqStackGetTop(SeqStack* stack, Point* value)
+{
+    if(stack == NULL || value == NULL)
+        return 0;
+    if(stack->size == 0)
+        return 0;
+    *value = stack->data[stack->size - 1];
+    return 1;
+}
+
+void SeqStackPrint(SeqStack* stack, const char* msg)
+{
+    printf("[%s]\n",msg);
+    if(stack == NULL)
+        return;
+    size_t i = 0;
+    for(; i<stack->size; ++i)
+    {
+        printf("(%d, %d)\n",stack->data[i].row,stack->data[i].col);
+    }
+    printf("\n");
+}
+
+void GetPathByLoop(Maze* maze, Point entry)
+{
+    if(maze == NULL)
+        return;
+    //1.创建一个栈，用于保存走过的路径
+    SeqStack stack;
+    SeqStackInit(&stack);
+    //2.判断入口能否落脚(不能说明传入的参数非法)
+    if(!CanStay(maze,entry))
+        return;
+    //3.能落脚就标记并入栈
+    Mark(maze,entry);
+    SeqStackPush(&stack, entry);
+    //4.进入循环，获取当前栈顶元素
+    while(1)
+    {
+        Point top;
+        int ret = SeqStackGetTop(&stack, &top);
+        if(ret == 0)//栈为空，回溯结束
+            return;
+        //5.判断是否为出口
+        if(IsExit(maze,top,entry))
+        {
+            printf("找到一条路\n");
+            SeqStackPrint(&stack,"找到的路径为");
+            return;
+        }
+        //6.顺时针取四周点，判断是否能落脚。能落脚就标记且入栈，进行下一轮循环
+        Point up = top;//上方点
+        up.row -= 1;
+        if(CanStay(maze,up))
+        {
+            Mark(maze,up);
+            SeqStackPush(&stack,up);
+            continue;
+        }
+        Point right = top;//右方点
+        right.col += 1;
+        if(CanStay(maze,right))
+        {
+            Mark(maze,right);
+            SeqStackPush(&stack,right);
+            continue;
+        }       
+        Point down = top;//下方点
+        down.row += 1;
+        if(CanStay(maze,down))
+        {
+            Mark(maze,down);
+            SeqStackPush(&stack,down);
+            continue;
+        } 
+        Point left = top;//左方点
+        left.col -= 1;
+        if(CanStay(maze,left))
+        {
+            Mark(maze,left);
+            SeqStackPush(&stack,left);
+            continue;
+        }
+        //7.若四周都不能落脚，出栈顶元素(出到栈为空，则说明没路可走)
+        SeqStackPop(&stack);
+    }
+}
+
+///////////////////////////////////////////////////////////////////
+/////////////       3.查找最短路径(递归实现)       ////////////////
+///////////////////////////////////////////////////////////////////
+
+void GetShortPath(Maze* maze, Point* entry)
+{//先遍历找到所有路径，找到里面最短的即可
+    SeqStack cur_path;
+    SeqStack short_path;
+    SeqStackInit(cur_path);
+    SeqStackInit(short_path);
+    _GetShortPath(maze, entry, entry, &cur_path, &short_path);
+    SeqStackPrint(&short,"最短路径");
+}
+
+void SeqStackAssgin(SeqStack* from, SeqStack* to)
+{
+    if(from==NULL || to==NULL)
+        return;
+
+}
+
+void _GetShortPath(Maze* maze, Point cur, Point entry, SeqStack* cur_path, SeqStack* short_path)
+{
+    //1.判断当前点是否能落脚
+    if(!CanStay(maze,cur))
+        return;
+    //2.能落脚，标记并入cur_path栈
+    Mark(maze,cur);
+    SeqStackPush(cur_path,cur);
+    //3.判断当前点是否为出口点
+    if(IsExit(maze,cur,entry))
+    {
+        printf("找到了一条路\n");
+        //1)为出口，找到一条路，此时若cur_path比short_path栈中路径短或short_path为空，用当前路径代替short_path中的路;
+        if(cur_path->size < short_path->size || short_path->size==0)
+        {
+            printf("找到一条较短路径\n");
+            SeqStackAssgin(cur_path, short_path);
+        }
+        //2)为出口，但比short_path中路径长，再回溯去找另外的路径,并出栈顶元素
+        //这里不论cur_path中路径比short_path中短还是长，只要是出口，都要回溯，去找是否还有其他路径
+        SeqStackPop(cur_path);
+        return;
+        //3)不是出口，探测周围四个相邻点
+        Point up = cur;
+        up.row -= 1;
+        _GetShortPath(maze,up,entry,cur_path,short_path);
+        Point right = cur;
+        down.col += 1;
+        _GetShortPath(maze,right,entry,cur_path,short_path);
+        Point down = cur;
+        down.row += 1;
+        _GetShortPath(maze,down,entry,cur_path,short_path);
+        Point left = cur;
+        left.col -= 1;
+        _GetShortPath(maze,left,entry,cur_path,short_path);
+    //4.四个点都探测过，就出栈回溯
+    SeqStackPop(cur_path);
+    return;
+}
+
+void test1()
+{
+    SHOW_NAME;
+    Maze maze;
+    MazeInit(&maze);
+    Point entry;
+    PointInit(&entry);
+    MazePrint(&maze,"初始迷宫地图");
+    GetPath(&maze,entry);
+    MazePrint(&maze,"寻找出路");
+}
+
+void test2()
+{
+    SHOW_NAME;
+    Maze maze;
+    MazeInit(&maze);
+    Point entry;
+    PointInit(&entry);
+    MazePrint(&maze,"初始迷宫地图");
+    GetPathByLoop(&maze,entry);
+    MazePrint(&maze,"寻找出路");
+}
+
+int main()
+{
+    test1();
+    test2();
+    return 0;
+}
